@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
+
 void main() {
   runApp(const StudentOSApp());
 }
@@ -12,11 +13,12 @@ class StudentOSApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'Student OS',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorSchemeSeed: Colors.deepPurple,
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xffF7F5FF),
       ),
       home: const HomeScreen(),
     );
@@ -26,22 +28,49 @@ class StudentOSApp extends StatelessWidget {
 class ApiService {
   static const String baseUrl = 'http://127.0.0.1:8000';
 
-  static Future<String> postAgent(String endpoint, String input) async {
+  static Future<String> postAgent(String endpoint, Map<String, dynamic> body) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/$endpoint'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'input': input}),
+        body: jsonEncode(body),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['result']?.toString() ?? 'No result received';
-      } else {
-        return 'Backend error: ${response.statusCode}';
+        return data['result']?.toString() ?? 'No result received from backend.';
       }
+      return 'Backend error: ${response.statusCode}\n${response.body}';
     } catch (e) {
-      return 'Could not connect to backend. Showing demo response.\n\n$e';
+      return 'Backend not connected. Demo mode active.\n\n$e';
+    }
+  }
+
+  static Future<String> uploadPdf(PlatformFile file) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/upload-pdf'),
+      );
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          file.bytes!,
+          filename: file.name,
+        ),
+      );
+
+      final response = await request.send();
+      final body = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(body);
+        return data['result']?.toString() ?? 'PDF uploaded successfully.';
+      }
+      return 'Upload failed: ${response.statusCode}\n$body';
+    } catch (e) {
+      return 'PDF upload failed.\n\n$e';
     }
   }
 }
@@ -69,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: screens[selectedIndex],
       bottomNavigationBar: NavigationBar(
+        height: 72,
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) {
           setState(() => selectedIndex = index);
@@ -89,33 +119,44 @@ class AppHeader extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const AppHeader({super.key, required this.title, required this.subtitle});
+  const AppHeader({
+    super.key,
+    required this.title,
+    required this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 45, 20, 25),
+      padding: const EdgeInsets.fromLTRB(20, 48, 20, 28),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xff6D28D9), Color(0xff9333EA)],
+          colors: [Color(0xff4C1D95), Color(0xff7C3AED), Color(0xffA855F7)],
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 28,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold)),
+          const Icon(Icons.auto_awesome, color: Colors.white, size: 34),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 31,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(subtitle,
-              style: const TextStyle(fontSize: 15, color: Colors.white70)),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 15, color: Colors.white70),
+          ),
         ],
       ),
     );
@@ -132,57 +173,85 @@ class DashboardScreen extends StatelessWidget {
         children: [
           const AppHeader(
             title: 'Student OS',
-            subtitle: 'Multi-agent AI assistant for student life',
+            subtitle: 'Your AI-powered multi-agent student assistant',
           ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              children: const [
-                InfoCard(
-                  icon: Icons.school,
-                  title: 'Academic Agent',
-                  text: 'Summarize notes, create quiz, generate flashcards.',
+              children: [
+                Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 33,
+                          child: Icon(Icons.person, size: 36),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Welcome Dhruv 👋',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text('B.Tech CSE Cyber Security'),
+                              Text('Galgotias University'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                InfoCard(
-                  icon: Icons.alarm,
-                  title: 'Deadline Agent',
-                  text: 'Track assignments, exams, reminders and priority.',
+                const SizedBox(height: 18),
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.15,
+                  children: const [
+                    StatCard(title: 'Notes Uploaded', value: '12', icon: Icons.note_alt),
+                    StatCard(title: 'Deadlines', value: '5', icon: Icons.alarm),
+                    StatCard(title: 'PDFs Scanned', value: '8', icon: Icons.picture_as_pdf),
+                    StatCard(title: 'AI Queries', value: '24', icon: Icons.smart_toy),
+                  ],
                 ),
-                InfoCard(
-                  icon: Icons.edit_note,
-                  title: 'Content Agent',
-                  text: 'Generate emails, reports and applications.',
+                const SizedBox(height: 18),
+                SectionTitle(title: 'Active Agents'),
+                const SizedBox(height: 10),
+                const Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    StatusChip(label: 'Academic Active'),
+                    StatusChip(label: 'Deadline Active'),
+                    StatusChip(label: 'Content Active'),
+                    StatusChip(label: 'PDF Tool Ready'),
+                  ],
                 ),
-                InfoCard(
-                  icon: Icons.picture_as_pdf,
-                  title: 'PDF/OCR Tools',
-                  text: 'Upload PDFs/images and extract useful student data.',
+                const SizedBox(height: 18),
+                const InfoCard(
+                  icon: Icons.lightbulb,
+                  title: 'AI Suggestion',
+                  text: 'Upload your syllabus PDF and let Student OS create notes, deadlines and study plan.',
                 ),
               ],
             ),
-          )
+          ),
         ],
-      ),
-    );
-  }
-}
-
-class InfoCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String text;
-
-  const InfoCard(
-      {super.key, required this.icon, required this.title, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 14),
-      child: ListTile(
-        leading: CircleAvatar(child: Icon(icon)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(text),
       ),
     );
   }
@@ -197,26 +266,79 @@ class AcademicScreen extends StatefulWidget {
 
 class _AcademicScreenState extends State<AcademicScreen> {
   final controller = TextEditingController();
+  String selectedTask = 'Summary';
   String result = '';
   bool loading = false;
 
   Future<void> generate() async {
+    if (controller.text.trim().isEmpty) {
+      setState(() => result = 'Please enter notes or a topic first.');
+      return;
+    }
+
     setState(() => loading = true);
-    result = await ApiService.postAgent('academic', controller.text);
+
+    result = await ApiService.postAgent('academic', {
+      'task': selectedTask,
+      'input': controller.text,
+    });
+
     setState(() => loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return AgentPage(
-      title: 'Academic Agent',
-      subtitle: 'Summaries, quiz and flashcards',
-      hint: 'Paste notes or topic here...',
-      controller: controller,
-      buttonText: 'Generate Summary',
-      result: result,
-      loading: loading,
-      onPressed: generate,
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const AppHeader(
+            title: 'Academic Agent',
+            subtitle: 'Summaries, quizzes and flashcards',
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedTask,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Academic Task',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Summary', child: Text('Generate Summary')),
+                    DropdownMenuItem(value: 'Quiz', child: Text('Generate Quiz')),
+                    DropdownMenuItem(value: 'Flashcards', child: Text('Generate Flashcards')),
+                    DropdownMenuItem(value: 'Study Plan', child: Text('Create Study Plan')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => selectedTask = value!);
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: controller,
+                  maxLines: 7,
+                  decoration: InputDecoration(
+                    hintText: 'Paste notes, syllabus or topic here...',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  text: loading ? 'Generating...' : 'Run Academic Agent',
+                  icon: Icons.auto_awesome,
+                  onPressed: loading ? null : generate,
+                ),
+                const SizedBox(height: 20),
+                ResultBox(result: result.isEmpty ? 'Academic result will appear here.' : result),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -229,27 +351,105 @@ class DeadlineScreen extends StatefulWidget {
 }
 
 class _DeadlineScreenState extends State<DeadlineScreen> {
-  final controller = TextEditingController();
+  final titleController = TextEditingController();
+  final dateController = TextEditingController();
+  String priority = 'Medium';
   String result = '';
   bool loading = false;
 
-  Future<void> generate() async {
+  Future<void> addDeadline() async {
+    if (titleController.text.trim().isEmpty || dateController.text.trim().isEmpty) {
+      setState(() => result = 'Please enter deadline title and due date.');
+      return;
+    }
+
     setState(() => loading = true);
-    result = await ApiService.postAgent('deadline', controller.text);
+
+    result = await ApiService.postAgent('deadline', {
+      'title': titleController.text,
+      'due_date': dateController.text,
+      'priority': priority,
+    });
+
     setState(() => loading = false);
+  }
+
+  Future<void> pickDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2030),
+      initialDate: DateTime.now(),
+    );
+
+    if (selected != null) {
+      dateController.text = '${selected.day}/${selected.month}/${selected.year}';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AgentPage(
-      title: 'Deadline Agent',
-      subtitle: 'Assignment and exam reminders',
-      hint: 'Example: Web Tech assignment due tomorrow...',
-      controller: controller,
-      buttonText: 'Add Deadline',
-      result: result,
-      loading: loading,
-      onPressed: generate,
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const AppHeader(
+            title: 'Deadline Agent',
+            subtitle: 'Track assignments, exams and priorities',
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                CustomInput(
+                  controller: titleController,
+                  label: 'Assignment / Exam Name',
+                  icon: Icons.assignment,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: dateController,
+                  readOnly: true,
+                  onTap: pickDate,
+                  decoration: InputDecoration(
+                    labelText: 'Due Date',
+                    prefixIcon: const Icon(Icons.calendar_month),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: priority,
+                  decoration: InputDecoration(
+                    labelText: 'Priority',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Low', child: Text('Low')),
+                    DropdownMenuItem(value: 'Medium', child: Text('Medium')),
+                    DropdownMenuItem(value: 'High', child: Text('High')),
+                    DropdownMenuItem(value: 'Urgent', child: Text('Urgent')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => priority = value!);
+                  },
+                ),
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  text: loading ? 'Saving...' : 'Add Deadline',
+                  icon: Icons.alarm_add,
+                  onPressed: loading ? null : addDeadline,
+                ),
+                const SizedBox(height: 20),
+                ResultBox(result: result.isEmpty ? 'Deadline confirmation will appear here.' : result),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -263,26 +463,81 @@ class ContentScreen extends StatefulWidget {
 
 class _ContentScreenState extends State<ContentScreen> {
   final controller = TextEditingController();
+  String contentType = 'Email';
   String result = '';
   bool loading = false;
 
-  Future<void> generate() async {
+  Future<void> generateContent() async {
+    if (controller.text.trim().isEmpty) {
+      setState(() => result = 'Please enter your content requirement.');
+      return;
+    }
+
     setState(() => loading = true);
-    result = await ApiService.postAgent('content', controller.text);
+
+    result = await ApiService.postAgent('content', {
+      'type': contentType,
+      'input': controller.text,
+    });
+
     setState(() => loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return AgentPage(
-      title: 'Content Agent',
-      subtitle: 'Emails, reports and applications',
-      hint: 'Write what you want to generate...',
-      controller: controller,
-      buttonText: 'Generate Content',
-      result: result,
-      loading: loading,
-      onPressed: generate,
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const AppHeader(
+            title: 'Content Agent',
+            subtitle: 'Emails, reports and applications',
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                DropdownButtonFormField<String>(
+                  value: contentType,
+                  decoration: InputDecoration(
+                    labelText: 'Content Type',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Email', child: Text('Email')),
+                    DropdownMenuItem(value: 'Report', child: Text('Report')),
+                    DropdownMenuItem(value: 'Application', child: Text('Application')),
+                    DropdownMenuItem(value: 'Resume Point', child: Text('Resume Point')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => contentType = value!);
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: controller,
+                  maxLines: 7,
+                  decoration: InputDecoration(
+                    hintText: 'Example: Write an email to mentor for meeting...',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  text: loading ? 'Generating...' : 'Generate Content',
+                  icon: Icons.edit_note,
+                  onPressed: loading ? null : generateContent,
+                ),
+                const SizedBox(height: 20),
+                ResultBox(result: result.isEmpty ? 'Generated content will appear here.' : result),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -314,47 +569,17 @@ class _ToolsScreenState extends State<ToolsScreen> {
       result = 'Uploading PDF...';
     });
 
-    try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('${ApiService.baseUrl}/upload-pdf'),
-      );
+    final uploadResult = await ApiService.uploadPdf(pickedFile.files.single);
 
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          pickedFile.files.single.bytes!,
-          filename: pickedFile.files.single.name,
-        ),
-      );
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
-        setState(() {
-          result = data['result']?.toString() ?? 'PDF uploaded successfully.';
-        });
-      } else {
-        setState(() {
-          result = 'Upload failed. Status code: ${response.statusCode}\n$responseBody';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        result = 'Could not upload PDF.\n\n$e';
-      });
-    } finally {
-      setState(() {
-        loading = false;
-      });
-    }
+    setState(() {
+      result = uploadResult;
+      loading = false;
+    });
   }
 
-  Future<void> uploadImageForOcr() async {
+  void uploadImageForOcr() {
     setState(() {
-      result = 'OCR image upload will connect to /ocr endpoint.';
+      result = 'OCR image upload is ready. Connect this to /ocr endpoint.';
     });
   }
 
@@ -365,49 +590,48 @@ class _ToolsScreenState extends State<ToolsScreen> {
         children: [
           const AppHeader(
             title: 'Tools',
-            subtitle: 'PDF, OCR and email tools',
+            subtitle: 'PDF upload, OCR and academic extraction',
           ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                   child: Padding(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        const Icon(Icons.picture_as_pdf,
-                            size: 48, color: Colors.deepPurple),
-                        const SizedBox(height: 10),
+                        const CircleAvatar(
+                          radius: 36,
+                          child: Icon(Icons.picture_as_pdf, size: 38),
+                        ),
+                        const SizedBox(height: 14),
                         const Text(
                           'Upload Academic PDF',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Upload notes, syllabus, assignment or report PDF.',
+                          'Upload notes, syllabus, assignment or report PDF for AI analysis.',
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 12),
                         if (selectedFileName != null)
-                          Text(
-                            'Selected: $selectedFileName',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.deepPurple.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text('Selected: $selectedFileName'),
                           ),
                         const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            onPressed: loading ? null : uploadPdf,
-                            icon: const Icon(Icons.upload_file),
-                            label: loading
-                                ? const Text('Uploading...')
-                                : const Text('Upload PDF'),
-                          ),
+                        PrimaryButton(
+                          text: loading ? 'Uploading...' : 'Upload PDF',
+                          icon: Icons.upload_file,
+                          onPressed: loading ? null : uploadPdf,
                         ),
                       ],
                     ),
@@ -415,12 +639,11 @@ class _ToolsScreenState extends State<ToolsScreen> {
                 ),
                 const SizedBox(height: 14),
                 Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   child: ListTile(
-                    leading: const CircleAvatar(
-                      child: Icon(Icons.image),
-                    ),
+                    leading: const CircleAvatar(child: Icon(Icons.image)),
                     title: const Text('Upload Image for OCR'),
-                    subtitle: const Text('Connects to OCR tool endpoint'),
+                    subtitle: const Text('Extract text from screenshots or handwritten notes'),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: uploadImageForOcr,
                   ),
@@ -429,76 +652,163 @@ class _ToolsScreenState extends State<ToolsScreen> {
                 ResultBox(result: result),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
   }
 }
 
-class AgentPage extends StatelessWidget {
+class StatCard extends StatelessWidget {
   final String title;
-  final String subtitle;
-  final String hint;
-  final TextEditingController controller;
-  final String buttonText;
-  final String result;
-  final bool loading;
-  final VoidCallback onPressed;
+  final String value;
+  final IconData icon;
 
-  const AgentPage({
+  const StatCard({
     super.key,
     required this.title,
-    required this.subtitle,
-    required this.hint,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              backgroundColor: Colors.deepPurple.shade50,
+              child: Icon(icon, color: Colors.deepPurple),
+            ),
+            const Spacer(),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+            ),
+            Text(title, style: const TextStyle(color: Colors.black54)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class StatusChip extends StatelessWidget {
+  final String label;
+
+  const StatusChip({super.key, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: const Icon(Icons.circle, size: 12, color: Colors.green),
+      label: Text(label),
+      backgroundColor: Colors.green.shade50,
+    );
+  }
+}
+
+class SectionTitle extends StatelessWidget {
+  final String title;
+
+  const SectionTitle({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+class InfoCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+
+  const InfoCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ListTile(
+        leading: CircleAvatar(child: Icon(icon)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(text),
+      ),
+    );
+  }
+}
+
+class CustomInput extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+
+  const CustomInput({
+    super.key,
     required this.controller,
-    required this.buttonText,
-    required this.result,
-    required this.loading,
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+    );
+  }
+}
+
+class PrimaryButton extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  const PrimaryButton({
+    super.key,
+    required this.text,
+    required this.icon,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          AppHeader(title: title, subtitle: subtitle),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: controller,
-                  maxLines: 7,
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: loading ? null : onPressed,
-                    child: loading
-                        ? const CircularProgressIndicator()
-                        : Text(buttonText),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ResultBox(
-                  result: result.isEmpty
-                      ? 'AI response will appear here.'
-                      : result,
-                ),
-              ],
-            ),
-          ),
-        ],
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon),
+        label: Text(text),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.deepPurple,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        ),
       ),
     );
   }
@@ -513,13 +823,23 @@ class ResultBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: Colors.deepPurple.shade50,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.deepPurple.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.deepPurple.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          )
+        ],
       ),
-      child: Text(result, style: const TextStyle(fontSize: 15)),
+      child: Text(
+        result,
+        style: const TextStyle(fontSize: 15, height: 1.4),
+      ),
     );
   }
 }
