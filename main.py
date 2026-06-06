@@ -1,0 +1,18 @@
+"""
+main.py
+Entry point for StudentOS backend.
+Run with: python main.py
+or:        uvicorn main:app --reload --host 0.0.0.0 --port 8000
+"""
+
+import uvicorn
+from api.app import app  # noqa: F401  (re-export for uvicorn)
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )
